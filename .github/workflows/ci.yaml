@@ -48,6 +48,8 @@ jobs:
       - name: Get dependencies
         run: go mod download
         working-directory: src/
+      - name: Extract tag name
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
       - name: Build
         run: go build -v -o capitalExporter-${{ env.TAG_NAME }} .
         working-directory: src/
