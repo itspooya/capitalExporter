@@ -67,9 +67,8 @@ jobs:
           name: capitalExporter-${{ env.TAG_NAME }}
           path: src/capitalExporter-${{ env.TAG_NAME }}
 
-  release:
+  package:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -80,15 +79,17 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: capitalExporter-${{ env.TAG_NAME }}
-          path: release
-      - name: Create GitHub Release
+          path: package
+      - name: Install GitHub CLI
+        run: sudo apt install -y gh
+      - name: Authenticate with GitHub CLI
+        run: echo ${{ secrets.GITHUB_TOKEN }} | gh auth login --with-token
+      - name: Convert repository name to lowercase
+        run: echo "REPO_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Publish to GitHub Packages
         run: |
-          gh release create v${{ env.TAG_NAME }} release/* \
-            --title "Release v${{ env.TAG_NAME }}" \
-            --notes "Release of v${{ env.TAG_NAME }}"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Remove tag without v
-        run: |
-          git tag -d ${{ env.TAG_NAME }}
-          git push origin :refs/tags/${{ env.TAG_NAME }}
+          tar czvf capitalExporter-${{ env.TAG_NAME }}.tar.gz -C package .
+          gh package create capitalExporter-${{ env.TAG_NAME }}.tar.gz \
+            --version=${{ env.TAG_NAME }} \
+            --repo=${{ env.REPO_NAME }} \
+            --public
