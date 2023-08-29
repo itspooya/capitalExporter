@@ -2,13 +2,16 @@ name: CI
 on:
   push:
     branches: [ master ]
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches: [ master ]
 
 jobs:
-    docker:
-      runs-on: ubuntu-latest
-      steps:
+  docker:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Set up QEMU
@@ -23,48 +26,53 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Convert repository name to lowercase
         run: echo "REPO_NAME=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Extract tag name
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ env.REPO_NAME }}:latest
-    build:
-      name: build
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v3
-        - name: Setup Go
-          uses: actions/setup-go@v4
-          with:
-            go-version: 1.21
-        - name: Get dependencies
-          run: go mod download
-          working-directory: src/
-        - name: Build
-          run: go build -v -o capitalExporter .
-          working-directory: src/
-        - name: upload artifact
-          uses: actions/upload-artifact@v3
-          with:
-            name: capitalExporter
-            path: src/capitalExporter
-    release:
-      needs: build
-      runs-on: ubuntu-latest
-      steps:
-        - name: Checkout
-          uses: actions/checkout@v3
-        - name: Download artifact
-          uses: actions/download-artifact@v3
-          with:
-            name: capitalExporter
-            path: release
-        - name: Create GitHub Release
-          run: |
-            gh release create ${{ github.sha }} release/* \
-              --title "Release ${{ github.sha }}" \
-              --notes "Release of ${{ github.sha }}"
-          env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tags: ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG_NAME }}
+
+  build:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.21
+      - name: Get dependencies
+        run: go mod download
+        working-directory: src/
+      - name: Build
+        run: go build -v -o capitalExporter-${{ env.TAG_NAME }} .
+        working-directory: src/
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: capitalExporter-${{ env.TAG_NAME }}
+          path: src/capitalExporter-${{ env.TAG_NAME }}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: capitalExporter-${{ env.TAG_NAME }}
+          path: release
+      - name: Create GitHub Release
+        run: |
+          gh release create ${{ env.TAG_NAME }} release/* \
+            --title "Release ${{ env.TAG_NAME }}" \
+            --notes "Release of ${{ env.TAG_NAME }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
