@@ -50,3 +50,19 @@ jobs:
           with:
             name: capitalExporter
             path: src/capitalExporter
+    release:
+      needs: build
+      runs-on: ubuntu-latest
+      steps:
+        - name: Download artifact
+          uses: actions/download-artifact@v3
+          with:
+            name: capitalExporter
+            path: release
+        - name: Create GitHub Release
+          run: |
+            gh release create ${{ github.sha }} release/* \
+              --title "Release ${{ github.sha }}" \
+              --notes "Release of ${{ github.sha }}"
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
