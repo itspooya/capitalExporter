@@ -3,7 +3,7 @@ on:
   push:
     branches: [ master ]
     tags:
-      - 'v*.*.*'
+      - '*.*.*'
   pull_request:
     branches: [ master ]
 
@@ -75,8 +75,13 @@ jobs:
           path: release
       - name: Create GitHub Release
         run: |
-          gh release create ${{ env.TAG_NAME }} release/* \
-            --title "Release ${{ env.TAG_NAME }}" \
-            --notes "Release of ${{ env.TAG_NAME }}"
+          gh release create v${{ env.TAG_NAME }} release/* \
+            --title "Release v${{ env.TAG_NAME }}" \
+            --notes "Release of v${{ env.TAG_NAME }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remove tag without v
+        run: |
+          git tag -d ${{ env.TAG_NAME }}
+          git push origin :refs/tags/${{ env.TAG_NAME }}
+          
